@@ -1,2 +1,2 @@
-class FiberedWorker
+module FiberedWorker
 end

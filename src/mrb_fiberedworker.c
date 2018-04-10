@@ -6,66 +6,87 @@
 ** See Copyright Notice in LICENSE
 */
 
-#include "mruby.h"
-#include "mruby/data.h"
 #include "mrb_fiberedworker.h"
+#include <mruby.h>
+#include <mruby/error.h>
+#include <signal.h>
 
 #define DONE mrb_gc_arena_restore(mrb, 0);
 
-typedef struct {
-  char *str;
-  int len;
-} mrb_fiberedworker_data;
+int mrb_signo_registered[64];
+int mrb_signo_signaled[64];
 
-static const struct mrb_data_type mrb_fiberedworker_data_type = {
-  "mrb_fiberedworker_data", mrb_free,
-};
-
-static mrb_value mrb_fiberedworker_init(mrb_state *mrb, mrb_value self)
+static void mrb_fw_sighandler_func(int signo)
 {
-  mrb_fiberedworker_data *data;
-  char *str;
-  int len;
+  mrb_signo_signaled[signo] = 1;
+}
 
-  data = (mrb_fiberedworker_data *)DATA_PTR(self);
-  if (data) {
-    mrb_free(mrb, data);
+static int mrb_fw__is_registerd_signal(int signo)
+{
+  return mrb_signo_registered[signo_idx];
+}
+
+static mrb_value mrb_fw_register_internal_handler(mrb_state *mrb, mrb_value self)
+{
+  mrb_int signo;
+  mrb_get_args(mrb, "i", &signo);
+  int signo_idx = (int)signo;
+  struct sigaction act;
+  if (mrb_fw__is_registerd_signal(signo_idx)) {
+    mrb_raise(mrb, E_RUNTIME_ERROR, "Signal already registered");
   }
-  DATA_TYPE(self) = &mrb_fiberedworker_data_type;
-  DATA_PTR(self) = NULL;
+  if (signo_idx > SIGRTMAX) {
+    mrb_raise(mrb, E_ARGUMENT_ERROR, "Signal NR must be less than SIGRTMAX");
+  }
 
-  mrb_get_args(mrb, "s", &str, &len);
-  data = (mrb_fiberedworker_data *)mrb_malloc(mrb, sizeof(mrb_fiberedworker_data));
-  data->str = str;
-  data->len = len;
-  DATA_PTR(self) = data;
+  act.sa_handler = mrb_fw_sighandler_func;
+  sigemptyset(&act.sa_mask);
+  act.sa_flags = 0;
 
-  return self;
+  if (sigaction(signo, &act, NULL) == -1) {
+    mrb_sys_fail(mrb, "sigaction");
+  }
+  mrb_signo_registered[signo_idx] = 1;
+  return mrb_fixnum_value(signo);
 }
 
-static mrb_value mrb_fiberedworker_hello(mrb_state *mrb, mrb_value self)
+static mrb_value mrb_fw_is_signaled(mrb_state *mrb, mrb_value self)
 {
-  mrb_fiberedworker_data *data = DATA_PTR(self);
+  mrb_int signo;
+  mrb_get_args(mrb, "i", &signo);
+  int signo_idx = (int)signo;
 
-  return mrb_str_new(mrb, data->str, data->len);
-}
+  if (!mrb_signo_registered[signo_idx]) {
+    return mrb_false_value();
+  }
+  mrb_bool signaled = (mrb_bool)mrb_signo_signaled[signo_idx];
+  if (signaled) {
+    mrb_signo_signaled[signo_idx] = 0;
+  }
 
-static mrb_value mrb_fiberedworker_hi(mrb_state *mrb, mrb_value self)
-{
-  return mrb_str_new_cstr(mrb, "hi!!");
+  return mrb_bool_value(signaled);
 }
 
 void mrb_mruby_fibered_worker_gem_init(mrb_state *mrb)
 {
   struct RClass *fiberedworker;
-  fiberedworker = mrb_define_class(mrb, "FiberedWorker", mrb->object_class);
-  mrb_define_method(mrb, fiberedworker, "initialize", mrb_fiberedworker_init, MRB_ARGS_REQ(1));
-  mrb_define_method(mrb, fiberedworker, "hello", mrb_fiberedworker_hello, MRB_ARGS_NONE());
-  mrb_define_class_method(mrb, fiberedworker, "hi", mrb_fiberedworker_hi, MRB_ARGS_NONE());
+  int i;
+  for (i = 0; i < SIGRTMAX; i++) {
+    mrb_signo_registered[i] = 0;
+    mrb_signo_signaled[i] = 0;
+  }
+
+  fiberedworker = mrb_define_module(mrb, "FiberedWorker");
+  mrb_define_module_function(mrb, fiberedworker, "register_internal_handler", mrb_fw_register_internal_handler, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, fiberedworker, "signaled_nonblock?", mrb_fw_is_signaled, MRB_ARGS_REQ(1));
+
+  mrb_define_const(mrb, fiberedworker, "SIGINT", mrb_fixnum_value(SIGINT));
+  mrb_define_const(mrb, fiberedworker, "SIGHUP", mrb_fixnum_value(SIGHUP));
+  mrb_define_const(mrb, fiberedworker, "SIGRTMIN", mrb_fixnum_value(SIGRTMIN));
+  mrb_define_const(mrb, fiberedworker, "SIGRTMAX", mrb_fixnum_value(SIGRTMAX));
   DONE;
 }
 
 void mrb_mruby_fibered_worker_gem_final(mrb_state *mrb)
 {
 }
-
