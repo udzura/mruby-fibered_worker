@@ -1,0 +1,6 @@
+name: mruby-fibered_worker
+description: FiberedWorker class
+author: Uchio Kondo
+website: https://github.com/udzura/mruby-fibered_worker
+protocol: git
+repository: https://github.com/udzura/mruby-fibered_worker.git
