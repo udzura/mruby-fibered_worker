@@ -52,8 +52,6 @@ pid = fork do
 end
 
 loop.pid = pid
-
-loop.pid = pid
 loop.register_timer(FiberedWorker::SIGRTMIN, 500, 500) do |signo|
   puts "Hey, this is SIGRTMIN: #{signo}"
 end
