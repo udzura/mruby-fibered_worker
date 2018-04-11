@@ -9,5 +9,7 @@ MRuby::Gem::Specification.new('mruby-fibered_worker') do |spec|
   spec.add_dependency 'mruby-fiber', core: 'mruby-fiber'
   spec.add_dependency 'mruby-process', mgem: 'mruby-process'
 
+  spec.add_test_dependency 'mruby-sleep', mgem: 'mruby-sleep'
+
   spec.linker.libraries << 'rt'
 end
