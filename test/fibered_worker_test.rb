@@ -43,9 +43,11 @@ assert("FiberedWorker::MainLoop#register_timer") do
   l = FiberedWorker::MainLoop.new
   pid = make_worker
   l.pid = pid
-  l.register_timer(SIGRT6, 50) do
+  l.register_timer(SIGRT6, 100) do
     ::Process.kill FiberedWorker::SIGTERM, pid
   end
+  start = __time_now_msec
   l.run
-  assert_true true
+  done = __time_now_msec
+  assert_true((done - start) >= 100)
 end
