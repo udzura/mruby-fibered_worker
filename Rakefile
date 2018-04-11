@@ -22,6 +22,12 @@ task :test => :mruby do
   sh "cd mruby && rake all test MRUBY_CONFIG=#{MRUBY_CONFIG}"
 end
 
+desc "memcheck"
+task :memcheck => :compile do
+  sh "valgrind  --leak-check=full ./mruby/bin/mruby -e '1000.times { l = FiberedWorker::MainLoop.new }'"
+  sh "valgrind  --leak-check=full ./mruby/bin/mruby -e '1000.times { t = FiberedWorker::Timer.new(10) }'"
+end
+
 desc "cleanup"
 task :clean do
   exit 0 unless File.directory?('mruby')

@@ -21,5 +21,6 @@ addons:
       - bison
       - git
       - gperf
+      - valgrind
 script:
   - rake test
