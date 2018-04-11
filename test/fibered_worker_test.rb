@@ -21,10 +21,10 @@ def make_worker
   fork { loop {sleep 1} }
 end
 
-SIGRT5  = FiberedWorker::SIGRTMIN+5
-SIGRT10 = FiberedWorker::SIGRTMIN+10
+SIGRT5 = FiberedWorker::SIGRTMIN+5
+SIGRT6 = FiberedWorker::SIGRTMIN+6
 
-assert("FiberedWorker::MainLoop#run") do
+assert("FiberedWorker::MainLoop#register_handler") do
   l = FiberedWorker::MainLoop.new
   pid = make_worker
   l.pid = pid
@@ -33,8 +33,19 @@ assert("FiberedWorker::MainLoop#run") do
   end
 
   t = FiberedWorker::Timer.new(SIGRT5)
-  t.start 100
+  t.start 50
 
+  l.run
+  assert_true true
+end
+
+assert("FiberedWorker::MainLoop#register_timer") do
+  l = FiberedWorker::MainLoop.new
+  pid = make_worker
+  l.pid = pid
+  l.register_timer(SIGRT6, 50) do
+    ::Process.kill FiberedWorker::SIGTERM, pid
+  end
   l.run
   assert_true true
 end
