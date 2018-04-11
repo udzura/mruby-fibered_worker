@@ -8,20 +8,15 @@ pid = fork do
 end
 
 loop.pid = pid
-loop.register_handler(FiberedWorker::SIGRTMIN, false) do |signo|
+loop.register_timer(FiberedWorker::SIGRTMIN, 500, 500) do |signo|
   puts "Hey, this is SIGRTMIN: #{signo}"
 end
 
-loop.register_handler(FiberedWorker::SIGRTMIN+1, true) do |signo|
+loop.register_timer(FiberedWorker::SIGRTMIN+1, 3000) do |signo|
   puts "Hey, this is SIGRTMIN+1 then stop: #{signo}"
   Process.kill :TERM, pid
 end
 
 puts "Parent: [#{Process.pid}]"
-
-t = FiberedWorker::Timer.new(FiberedWorker::SIGRTMIN)
-t.start(500, 500)
-t2 = FiberedWorker::Timer.new(FiberedWorker::SIGRTMIN+1)
-t2.start(3000)
 loop.run
 puts "Loop exited"

@@ -1,9 +1,11 @@
 module FiberedWorker
   class MainLoop
-    attr_accessor :pid, :handlers
+    attr_accessor :pid
+    attr_reader   :handlers, :timers
 
     def initialize
       @handlers = []
+      @timers = []
     end
 
     def new_watchdog
@@ -38,8 +40,22 @@ module FiberedWorker
       end
     end
 
+    def register_timer(signo, start, interval=0, &blk)
+      register_handler(signo, (interval == 0), &blk)
+      self.timers << [
+        FiberedWorker::Timer.new(signo),
+        [start, interval]
+      ]
+    end
+
     def run
       watchdog = new_watchdog
+      self.timers.each do |data|
+        timer = data[0]
+        args = data[1]
+        timer.start(args[0], args[1])
+      end
+
       before = Time.now
       until watchdog.resume
         # infinite loop to wait
