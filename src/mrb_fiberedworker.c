@@ -13,8 +13,13 @@
 #include <mruby/data.h>
 #include <mruby/error.h>
 #include <mruby/hash.h>
+#include <mruby/string.h>
 #include <signal.h>
+#include <stdlib.h>
+#include <string.h>
 #include <time.h>
+
+#include "signames.defs"
 
 #define DONE mrb_gc_arena_restore(mrb, 0);
 
@@ -31,11 +36,71 @@ static int mrb_fw__is_registerd_signal(int signo)
   return mrb_signo_registered[signo];
 }
 
+static int signm2signo(const char *nm)
+{
+  const struct signals *sigs;
+
+  for (sigs = siglist; sigs->signm; sigs++) {
+    if (strcmp(sigs->signm, nm) == 0) {
+      return sigs->signo;
+    }
+  }
+
+  /* Handle RT Signal#0 as special for strtol's err spec */
+  if (strcmp("RT0", nm) == 0) {
+    return SIGRTMIN;
+  }
+
+  if (strncmp("RT", nm, 2) == 0) {
+    int ret = (int)strtol(nm + 2, NULL, 0);
+    if (!ret || (SIGRTMIN + ret > SIGRTMAX)) {
+      return 0;
+    }
+    return SIGRTMIN + ret;
+  }
+  return 0;
+}
+
+static int mrb_to_signo(mrb_state *mrb, mrb_value vsig)
+{
+  int sig = -1;
+  const char *s;
+
+  switch (mrb_type(vsig)) {
+  case MRB_TT_FIXNUM:
+    sig = mrb_fixnum(vsig);
+    if (sig < 0 || sig >= SIGRTMAX) {
+      mrb_raisef(mrb, E_ARGUMENT_ERROR, "invalid signal number (%S)", vsig);
+    }
+    break;
+  case MRB_TT_SYMBOL:
+    s = mrb_sym2name(mrb, mrb_symbol(vsig));
+    if (!s) {
+      mrb_raise(mrb, E_ARGUMENT_ERROR, "bad signal");
+    }
+    goto str_signal;
+  default:
+    vsig = mrb_string_type(mrb, vsig);
+    s = RSTRING_PTR(vsig);
+
+  str_signal:
+    if (memcmp("SIG", s, 3) == 0) {
+      s += 3;
+    }
+    sig = signm2signo(s);
+    if (sig == 0 && strcmp(s, "EXIT") != 0) {
+      mrb_raise(mrb, E_ARGUMENT_ERROR, "unsupported signal");
+    }
+    break;
+  }
+  return sig;
+}
+
 static mrb_value mrb_fw_register_internal_handler(mrb_state *mrb, mrb_value self)
 {
-  mrb_int signo;
-  mrb_get_args(mrb, "i", &signo);
-  int signo_idx = (int)signo;
+  mrb_value signo;
+  mrb_get_args(mrb, "o", &signo);
+  int signo_idx = mrb_to_signo(mrb, signo);
   struct sigaction act;
   if (mrb_fw__is_registerd_signal(signo_idx)) {
     mrb_raise(mrb, E_RUNTIME_ERROR, "Signal already registered");
@@ -48,28 +113,37 @@ static mrb_value mrb_fw_register_internal_handler(mrb_state *mrb, mrb_value self
   sigemptyset(&act.sa_mask);
   act.sa_flags = SA_RESTART;
 
-  if (sigaction(signo, &act, NULL) == -1) {
+  if (sigaction(signo_idx, &act, NULL) == -1) {
     mrb_sys_fail(mrb, "sigaction");
   }
   mrb_signo_registered[signo_idx] = 1;
-  return mrb_fixnum_value(signo);
+  return mrb_fixnum_value(signo_idx);
+}
+
+static mrb_value mrb_fw_obj2signo(mrb_state *mrb, mrb_value self)
+{
+  mrb_value signo;
+  mrb_get_args(mrb, "o", &signo);
+  int signo_idx = mrb_to_signo(mrb, signo);
+
+  return mrb_fixnum_value((mrb_int)signo_idx);
 }
 
 static mrb_value mrb_fw_is_registered(mrb_state *mrb, mrb_value self)
 {
-  mrb_int signo;
-  mrb_get_args(mrb, "i", &signo);
-  int signo_idx = (int)signo;
+  mrb_value signo;
+  mrb_get_args(mrb, "o", &signo);
+  int signo_idx = mrb_to_signo(mrb, signo);
 
   return mrb_bool_value((mrb_bool)mrb_fw__is_registerd_signal(signo_idx));
 }
 
 static mrb_value mrb_fw_is_signaled(mrb_state *mrb, mrb_value self)
 {
-  mrb_int signo;
+  mrb_value signo;
   mrb_bool signaled = FALSE;
-  mrb_get_args(mrb, "i", &signo);
-  int signo_idx = (int)signo;
+  mrb_get_args(mrb, "o", &signo);
+  int signo_idx = mrb_to_signo(mrb, signo);
   sigset_t mask, old_mask;
   sigemptyset(&mask);
   sigemptyset(&old_mask);
@@ -115,13 +189,13 @@ static mrb_value mrb_timer_posix_init(mrb_state *mrb, mrb_value self)
 {
   mrb_fw_timer_data *data;
   timer_t *timer_ptr;
-  mrb_int signo;
+  mrb_value signo;
   struct sigevent sev;
   memset(&sev, 0, sizeof(struct sigevent));
 
-  mrb_get_args(mrb, "i", &signo);
+  mrb_get_args(mrb, "o", &signo);
   sev.sigev_notify = SIGEV_SIGNAL;
-  sev.sigev_signo = (int)signo;
+  sev.sigev_signo = mrb_to_signo(mrb, signo);
 
   timer_ptr = (timer_t *)mrb_malloc(mrb, sizeof(timer_t));
   if (timer_create(CLOCK_REALTIME, &sev, timer_ptr) == -1) {
@@ -241,6 +315,7 @@ void mrb_mruby_fibered_worker_gem_init(mrb_state *mrb)
   fiberedworker = mrb_define_module(mrb, "FiberedWorker");
   mrb_define_module_function(mrb, fiberedworker, "register_internal_handler", mrb_fw_register_internal_handler, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, fiberedworker, "registered?", mrb_fw_is_registered, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, fiberedworker, "obj2signo", mrb_fw_obj2signo, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, fiberedworker, "signaled_nonblock?", mrb_fw_is_signaled, MRB_ARGS_REQ(1));
 
   mrb_define_const(mrb, fiberedworker, "SIGINT", mrb_fixnum_value(SIGINT));

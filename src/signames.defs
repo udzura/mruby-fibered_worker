@@ -1,0 +1,138 @@
+/* -*- mode: c -*- */
+/* thanks: https://github.com/ksss/mruby-signal/blob/master/src/signal.c */
+static const struct signals {
+  const char *signm;
+  int signo;
+} siglist[] = {{"EXIT", 0},
+#ifdef SIGHUP
+               {"HUP", SIGHUP},
+#endif
+               {"INT", SIGINT},
+#ifdef SIGQUIT
+               {"QUIT", SIGQUIT},
+#endif
+#ifdef SIGILL
+               {"ILL", SIGILL},
+#endif
+#ifdef SIGTRAP
+               {"TRAP", SIGTRAP},
+#endif
+#ifdef SIGABRT
+               {"ABRT", SIGABRT},
+#endif
+#ifdef SIGIOT
+               {"IOT", SIGIOT},
+#endif
+#ifdef SIGEMT
+               {"EMT", SIGEMT},
+#endif
+#ifdef SIGFPE
+               {"FPE", SIGFPE},
+#endif
+#ifdef SIGKILL
+               {"KILL", SIGKILL},
+#endif
+#ifdef SIGBUS
+               {"BUS", SIGBUS},
+#endif
+#ifdef SIGSEGV
+               {"SEGV", SIGSEGV},
+#endif
+#ifdef SIGSYS
+               {"SYS", SIGSYS},
+#endif
+#ifdef SIGPIPE
+               {"PIPE", SIGPIPE},
+#endif
+#ifdef SIGALRM
+               {"ALRM", SIGALRM},
+#endif
+#ifdef SIGTERM
+               {"TERM", SIGTERM},
+#endif
+#ifdef SIGURG
+               {"URG", SIGURG},
+#endif
+#ifdef SIGSTOP
+               {"STOP", SIGSTOP},
+#endif
+#ifdef SIGTSTP
+               {"TSTP", SIGTSTP},
+#endif
+#ifdef SIGCONT
+               {"CONT", SIGCONT},
+#endif
+#ifdef SIGCHLD
+               {"CHLD", SIGCHLD},
+#endif
+#ifdef SIGCLD
+               {"CLD", SIGCLD},
+#else
+#ifdef SIGCHLD
+               {"CLD", SIGCHLD},
+#endif
+#endif
+#ifdef SIGTTIN
+               {"TTIN", SIGTTIN},
+#endif
+#ifdef SIGTTOU
+               {"TTOU", SIGTTOU},
+#endif
+#ifdef SIGIO
+               {"IO", SIGIO},
+#endif
+#ifdef SIGXCPU
+               {"XCPU", SIGXCPU},
+#endif
+#ifdef SIGXFSZ
+               {"XFSZ", SIGXFSZ},
+#endif
+#ifdef SIGVTALRM
+               {"VTALRM", SIGVTALRM},
+#endif
+#ifdef SIGPROF
+               {"PROF", SIGPROF},
+#endif
+#ifdef SIGWINCH
+               {"WINCH", SIGWINCH},
+#endif
+#ifdef SIGUSR1
+               {"USR1", SIGUSR1},
+#endif
+#ifdef SIGUSR2
+               {"USR2", SIGUSR2},
+#endif
+#ifdef SIGLOST
+               {"LOST", SIGLOST},
+#endif
+#ifdef SIGMSG
+               {"MSG", SIGMSG},
+#endif
+#ifdef SIGPWR
+               {"PWR", SIGPWR},
+#endif
+#ifdef SIGPOLL
+               {"POLL", SIGPOLL},
+#endif
+#ifdef SIGDANGER
+               {"DANGER", SIGDANGER},
+#endif
+#ifdef SIGMIGRATE
+               {"MIGRATE", SIGMIGRATE},
+#endif
+#ifdef SIGPRE
+               {"PRE", SIGPRE},
+#endif
+#ifdef SIGGRANT
+               {"GRANT", SIGGRANT},
+#endif
+#ifdef SIGRETRACT
+               {"RETRACT", SIGRETRACT},
+#endif
+#ifdef SIGSOUND
+               {"SOUND", SIGSOUND},
+#endif
+#ifdef SIGINFO
+               {"INFO", SIGINFO},
+#endif
+{NULL, 0}};
