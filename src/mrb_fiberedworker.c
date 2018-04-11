@@ -13,7 +13,9 @@
 #include <mruby/data.h>
 #include <mruby/error.h>
 #include <mruby/hash.h>
+#include <mruby/string.h>
 #include <signal.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
@@ -96,9 +98,9 @@ static int mrb_to_signo(mrb_state *mrb, mrb_value vsig)
 
 static mrb_value mrb_fw_register_internal_handler(mrb_state *mrb, mrb_value self)
 {
-  mrb_int signo;
-  mrb_get_args(mrb, "i", &signo);
-  int signo_idx = (int)signo;
+  mrb_value signo;
+  mrb_get_args(mrb, "o", &signo);
+  int signo_idx = mrb_to_signo(mrb, signo);
   struct sigaction act;
   if (mrb_fw__is_registerd_signal(signo_idx)) {
     mrb_raise(mrb, E_RUNTIME_ERROR, "Signal already registered");
@@ -111,28 +113,28 @@ static mrb_value mrb_fw_register_internal_handler(mrb_state *mrb, mrb_value self
   sigemptyset(&act.sa_mask);
   act.sa_flags = SA_RESTART;
 
-  if (sigaction(signo, &act, NULL) == -1) {
+  if (sigaction(signo_idx, &act, NULL) == -1) {
     mrb_sys_fail(mrb, "sigaction");
   }
   mrb_signo_registered[signo_idx] = 1;
-  return mrb_fixnum_value(signo);
+  return mrb_fixnum_value(signo_idx);
 }
 
 static mrb_value mrb_fw_is_registered(mrb_state *mrb, mrb_value self)
 {
-  mrb_int signo;
-  mrb_get_args(mrb, "i", &signo);
-  int signo_idx = (int)signo;
+  mrb_value signo;
+  mrb_get_args(mrb, "o", &signo);
+  int signo_idx = mrb_to_signo(mrb, signo);
 
   return mrb_bool_value((mrb_bool)mrb_fw__is_registerd_signal(signo_idx));
 }
 
 static mrb_value mrb_fw_is_signaled(mrb_state *mrb, mrb_value self)
 {
-  mrb_int signo;
+  mrb_value signo;
   mrb_bool signaled = FALSE;
-  mrb_get_args(mrb, "i", &signo);
-  int signo_idx = (int)signo;
+  mrb_get_args(mrb, "o", &signo);
+  int signo_idx = mrb_to_signo(mrb, signo);
   sigset_t mask, old_mask;
   sigemptyset(&mask);
   sigemptyset(&old_mask);
@@ -178,13 +180,13 @@ static mrb_value mrb_timer_posix_init(mrb_state *mrb, mrb_value self)
 {
   mrb_fw_timer_data *data;
   timer_t *timer_ptr;
-  mrb_int signo;
+  mrb_value signo;
   struct sigevent sev;
   memset(&sev, 0, sizeof(struct sigevent));
 
-  mrb_get_args(mrb, "i", &signo);
+  mrb_get_args(mrb, "o", &signo);
   sev.sigev_notify = SIGEV_SIGNAL;
-  sev.sigev_signo = (int)signo;
+  sev.sigev_signo = mrb_to_signo(mrb, signo);
 
   timer_ptr = (timer_t *)mrb_malloc(mrb, sizeof(timer_t));
   if (timer_create(CLOCK_REALTIME, &sev, timer_ptr) == -1) {
