@@ -58,13 +58,6 @@ module FiberedWorker
 
       before = Time.now
       until watchdog.resume
-        # infinite loop to wait
-        after = Time.now
-        if after.to_i - before.to_i >= 1
-          puts "[#{Process.pid}] nonblocking run: #{after.inspect}"
-          before = after
-        end
-
         self.handlers.each do |fib|
           if fib.alive?
             fib.resume
