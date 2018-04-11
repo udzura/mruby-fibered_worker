@@ -245,6 +245,7 @@ void mrb_mruby_fibered_worker_gem_init(mrb_state *mrb)
 
   mrb_define_const(mrb, fiberedworker, "SIGINT", mrb_fixnum_value(SIGINT));
   mrb_define_const(mrb, fiberedworker, "SIGHUP", mrb_fixnum_value(SIGHUP));
+  mrb_define_const(mrb, fiberedworker, "SIGTERM", mrb_fixnum_value(SIGTERM));
   mrb_define_const(mrb, fiberedworker, "SIGRTMIN", mrb_fixnum_value(SIGRTMIN));
   mrb_define_const(mrb, fiberedworker, "SIGRTMAX", mrb_fixnum_value(SIGRTMAX));
 
