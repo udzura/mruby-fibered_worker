@@ -24,3 +24,4 @@ addons:
       - valgrind
 script:
   - rake test
+  - rake memcheck
