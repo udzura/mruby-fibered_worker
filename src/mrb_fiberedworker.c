@@ -120,6 +120,15 @@ static mrb_value mrb_fw_register_internal_handler(mrb_state *mrb, mrb_value self
   return mrb_fixnum_value(signo_idx);
 }
 
+static mrb_value mrb_fw_obj2signo(mrb_state *mrb, mrb_value self)
+{
+  mrb_value signo;
+  mrb_get_args(mrb, "o", &signo);
+  int signo_idx = mrb_to_signo(mrb, signo);
+
+  return mrb_fixnum_value((mrb_int)signo_idx);
+}
+
 static mrb_value mrb_fw_is_registered(mrb_state *mrb, mrb_value self)
 {
   mrb_value signo;
@@ -306,6 +315,7 @@ void mrb_mruby_fibered_worker_gem_init(mrb_state *mrb)
   fiberedworker = mrb_define_module(mrb, "FiberedWorker");
   mrb_define_module_function(mrb, fiberedworker, "register_internal_handler", mrb_fw_register_internal_handler, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, fiberedworker, "registered?", mrb_fw_is_registered, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, fiberedworker, "obj2signo", mrb_fw_obj2signo, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, fiberedworker, "signaled_nonblock?", mrb_fw_is_signaled, MRB_ARGS_REQ(1));
 
   mrb_define_const(mrb, fiberedworker, "SIGINT", mrb_fixnum_value(SIGINT));
