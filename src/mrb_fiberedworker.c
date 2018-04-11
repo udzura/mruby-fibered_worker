@@ -46,7 +46,7 @@ static mrb_value mrb_fw_register_internal_handler(mrb_state *mrb, mrb_value self
 
   act.sa_handler = mrb_fw_sighandler_func;
   sigemptyset(&act.sa_mask);
-  act.sa_flags = 0;
+  act.sa_flags = SA_RESTART;
 
   if (sigaction(signo, &act, NULL) == -1) {
     mrb_sys_fail(mrb, "sigaction");
@@ -67,17 +67,31 @@ static mrb_value mrb_fw_is_registered(mrb_state *mrb, mrb_value self)
 static mrb_value mrb_fw_is_signaled(mrb_state *mrb, mrb_value self)
 {
   mrb_int signo;
+  mrb_bool signaled = FALSE;
   mrb_get_args(mrb, "i", &signo);
   int signo_idx = (int)signo;
+  sigset_t mask, old_mask;
+  sigemptyset(&mask);
+  sigemptyset(&old_mask);
+  if (sigaddset(&mask, signo_idx) < 0) {
+    mrb_sys_fail(mrb, "sigaddset");
+  }
+  if (sigprocmask(SIG_BLOCK, &mask, &old_mask) < 0) {
+    mrb_sys_fail(mrb, "sigprocmask");
+  }
 
   if (!mrb_signo_registered[signo_idx]) {
-    return mrb_false_value();
+    goto ensure_recovermask;
   }
-  mrb_bool signaled = (mrb_bool)mrb_signo_signaled[signo_idx];
+  signaled = (mrb_bool)mrb_signo_signaled[signo_idx];
   if (signaled) {
     mrb_signo_signaled[signo_idx] = 0;
   }
 
+ensure_recovermask:
+  if (sigprocmask(SIG_SETMASK, &old_mask, NULL) < 0) {
+    mrb_sys_fail(mrb, "sigprocmask: recovery");
+  }
   return mrb_bool_value(signaled);
 }
 
