@@ -23,6 +23,7 @@ end
 
 SIGRT5 = FiberedWorker::SIGRTMIN+5
 SIGRT6 = FiberedWorker::SIGRTMIN+6
+SIGRT7 = FiberedWorker::SIGRTMIN+7
 
 assert("FiberedWorker::MainLoop#register_handler") do
   l = FiberedWorker::MainLoop.new
@@ -50,4 +51,21 @@ assert("FiberedWorker::MainLoop#register_timer") do
   l.run
   done = __time_now_msec
   assert_true((done - start) >= 100)
+end
+
+assert("FiberedWorker::MainLoop#register_timer with interval") do
+  l = FiberedWorker::MainLoop.new
+  pid = make_worker
+  count = 0
+  l.pid = pid
+  l.register_timer(SIGRT7, 50, 50) do
+    count += 1
+    if count >= 3
+      ::Process.kill FiberedWorker::SIGTERM, pid
+    end
+  end
+  start = __time_now_msec
+  l.run
+  done = __time_now_msec
+  assert_true((done - start) >= 150)
 end
