@@ -56,13 +56,15 @@ module FiberedWorker
       end
 
       before = Time.now
-      until watchdog.resume
+      until ret = watchdog.resume
         self.handlers.each do |fib|
           if fib.alive?
             fib.resume
           end
         end
       end
+
+      return ret
     end
   end
 end
