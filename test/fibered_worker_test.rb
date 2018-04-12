@@ -36,8 +36,9 @@ assert("FiberedWorker::MainLoop#register_handler") do
   t = FiberedWorker::Timer.new(SIGRT5)
   t.start 50
 
-  l.run
-  assert_true true
+  ret = l.run
+  assert_true ret[0].is_a?(Fixnum), "ret[0] should be a pid"
+  assert_true ret[1].is_a?(Process::Status), "ret[1] should be a Process::Status instance"
 end
 
 assert("FiberedWorker::MainLoop#register_timer") do

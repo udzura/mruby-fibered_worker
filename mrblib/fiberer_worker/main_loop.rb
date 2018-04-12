@@ -11,12 +11,11 @@ module FiberedWorker
     def new_watchdog
       target = self.pid
       return Fiber.new do
-        ret = nil
-        quit = false
-        until quit
+        keep = true
+        while keep
           ret = Process.waitpid2(target, Process::WNOHANG)
           if ret
-            break
+            keep = false
           end
           Fiber.yield ret
         end
@@ -57,13 +56,15 @@ module FiberedWorker
       end
 
       before = Time.now
-      until watchdog.resume
+      until ret = watchdog.resume
         self.handlers.each do |fib|
           if fib.alive?
             fib.resume
           end
         end
       end
+
+      return ret
     end
   end
 end
