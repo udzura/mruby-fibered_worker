@@ -11,12 +11,11 @@ module FiberedWorker
     def new_watchdog
       target = self.pid
       return Fiber.new do
-        ret = nil
-        quit = false
-        until quit
+        keep = true
+        until keep
           ret = Process.waitpid2(target, Process::WNOHANG)
           if ret
-            break
+            keep = false
           end
           Fiber.yield ret
         end
