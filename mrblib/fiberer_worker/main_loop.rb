@@ -12,7 +12,7 @@ module FiberedWorker
       target = self.pid
       return Fiber.new do
         keep = true
-        until keep
+        while keep
           ret = Process.waitpid2(target, Process::WNOHANG)
           if ret
             keep = false
