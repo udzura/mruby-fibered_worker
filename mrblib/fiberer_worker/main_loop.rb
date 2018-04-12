@@ -1,15 +1,21 @@
 module FiberedWorker
   class MainLoop
-    attr_accessor :pid
+    attr_accessor :pid, :interval
     attr_reader   :handlers, :timers
 
-    def initialize
+    def initialize(opt={})
+      @interval = opt[:interval] || nil # by msec
+      @pid = opt[:pid] || nil
       @handlers = []
       @timers = []
     end
 
     def new_watchdog
       target = self.pid
+      unless target
+        raise "Target pid must be set"
+      end
+
       return Fiber.new do
         keep = true
         while keep
@@ -61,6 +67,11 @@ module FiberedWorker
           if fib.alive?
             fib.resume
           end
+        end
+
+        if @interval
+          # use mruby-sleep's usleep
+          Sleep.usleep @interval * 1000
         end
       end
 
