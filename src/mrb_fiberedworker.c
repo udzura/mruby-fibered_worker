@@ -96,6 +96,71 @@ static int mrb_to_signo(mrb_state *mrb, mrb_value vsig)
   return sig;
 }
 
+static mrb_value mrb_fw_sigprocmask(mrb_state *mrb, mrb_value self)
+{
+  mrb_value *signals;
+  mrb_int siglen;
+  mrb_get_args(mrb, "a", &signals, &siglen);
+  int i;
+  sigset_t current_set;
+  if (sigemptyset(&current_set) < 0) {
+    mrb_sys_fail(mrb, "sigemptyset");
+  }
+
+  for (i = 0; i < siglen; i++) {
+    int signo_idx = mrb_to_signo(mrb, signals[i]);
+    if (sigaddset(&current_set, signo_idx) < 0) {
+      mrb_sys_fail(mrb, "sigaddset");
+    }
+  }
+
+  if (sigprocmask(SIG_BLOCK, &current_set, NULL) < 0) {
+    mrb_sys_fail(mrb, "sigprocmask");
+  }
+
+  return mrb_fixnum_value(siglen);
+}
+
+static mrb_value mrb_fw_sigtimedwait(mrb_state *mrb, mrb_value self)
+{
+  mrb_value *signals;
+  mrb_int siglen;
+  mrb_int interval_msec = 0;
+  mrb_get_args(mrb, "ai", &signals, &siglen, &interval_msec);
+  sigset_t current_set;
+  siginfo_t sig;
+  struct timespec ts;
+
+  if (sigemptyset(&current_set) < 0) {
+    mrb_sys_fail(mrb, "sigemptyset");
+  }
+
+  int i;
+  for (i = 0; i < siglen; i++) {
+    int signo_idx = mrb_to_signo(mrb, signals[i]);
+    if (sigaddset(&current_set, signo_idx) < 0) {
+      mrb_sys_fail(mrb, "sigaddset");
+    }
+  }
+
+  mrb_assert(interval_msec >= 0);
+  ts.tv_sec = (time_t)(interval_msec / 1000);
+  ts.tv_nsec = (long)((interval_msec - ts.tv_sec * 1000) * 1000 * 1000);
+
+  if (sigtimedwait(&current_set, &sig, &ts) == -1) {
+    switch (errno) {
+    case EAGAIN:
+    case EINTR:
+      return mrb_nil_value();
+    default:
+      mrb_sys_fail(mrb, "sigtimedwait");
+      return mrb_nil_value();
+    }
+  } else {
+    return mrb_fixnum_value(sig.si_signo);
+  }
+}
+
 static mrb_value mrb_fw_register_internal_handler(mrb_state *mrb, mrb_value self)
 {
   mrb_value signo;
@@ -313,6 +378,8 @@ void mrb_mruby_fibered_worker_gem_init(mrb_state *mrb)
   }
 
   fiberedworker = mrb_define_module(mrb, "FiberedWorker");
+  mrb_define_module_function(mrb, fiberedworker, "sigprocmask", mrb_fw_sigprocmask, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, fiberedworker, "sigtimedwait", mrb_fw_sigtimedwait, MRB_ARGS_REQ(2));
   mrb_define_module_function(mrb, fiberedworker, "register_internal_handler", mrb_fw_register_internal_handler, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, fiberedworker, "registered?", mrb_fw_is_registered, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, fiberedworker, "obj2signo", mrb_fw_obj2signo, MRB_ARGS_REQ(1));
