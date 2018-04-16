@@ -30,6 +30,10 @@ module FiberedWorker
 
     def register_handler(signo, once=true, &blk)
       key = FiberedWorker.obj2signo(signo)
+      if self.handlers[key]
+        raise "Handler already registered for signal #{signo}"
+      end
+
       self.handlers[key] = Fiber.new do
         keep = true
         while keep
@@ -44,6 +48,10 @@ module FiberedWorker
 
     def registered_signals
       self.handlers.keys
+    end
+
+    def registered?(signo)
+      !! self.handlers[FiberedWorker.obj2signo(signo)]
     end
 
     def register_timer(signo, start, interval=0, &blk)
