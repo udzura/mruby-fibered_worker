@@ -18,6 +18,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 #include "signames.defs"
 
@@ -146,6 +148,45 @@ static mrb_value mrb_fw_sigtimedwait(mrb_state *mrb, mrb_value self)
   } else {
     return mrb_fixnum_value(sig.si_signo);
   }
+}
+
+static mrb_value mrb_fw_do_nonblocking_fd(mrb_state *mrb, mrb_value self)
+{
+  int val;
+  mrb_int fd;
+  mrb_get_args(mrb, "i", &fd);
+
+  val = fcntl((int)fd, F_GETFL, 0);
+  if(val < 0) {
+    mrb_sys_fail(mrb, "fcntl F_GETFL");
+  }
+
+  if(val & O_NONBLOCK) {
+    return mrb_true_value();
+  } else {
+    if(fcntl((int)fd, F_SETFL, val | O_NONBLOCK) < 0){
+      mrb_sys_fail(mrb, "fcntl F_SETFL");
+    }
+    return mrb_true_value();
+  }
+}
+
+static mrb_value mrb_fw_read_nonblock(mrb_state *mrb, mrb_value self)
+{
+  int ret;
+  mrb_int fd;
+  uint64_t result;
+  mrb_get_args(mrb, "i", &fd);
+  ret = read(fd, &result, sizeof(result));
+  if (ret == -1) {
+    if (errno == EAGAIN) {
+      return mrb_nil_value();
+    } else {
+      mrb_sys_fail(mrb, "read nonblock");
+    }
+  }
+
+  return mrb_fixnum_value((mrb_int)result);
 }
 
 static mrb_value mrb_fw_obj2signo(mrb_state *mrb, mrb_value self)
@@ -298,6 +339,8 @@ void mrb_mruby_fibered_worker_gem_init(mrb_state *mrb)
   fiberedworker = mrb_define_module(mrb, "FiberedWorker");
   mrb_define_module_function(mrb, fiberedworker, "sigprocmask", mrb_fw_sigprocmask, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, fiberedworker, "sigtimedwait", mrb_fw_sigtimedwait, MRB_ARGS_REQ(2));
+  mrb_define_module_function(mrb, fiberedworker, "nonblocking_fd!", mrb_fw_do_nonblocking_fd, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, fiberedworker, "read_nonblock", mrb_fw_read_nonblock, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, fiberedworker, "obj2signo", mrb_fw_obj2signo, MRB_ARGS_REQ(1));
 
   mrb_define_const(mrb, fiberedworker, "SIGINT", mrb_fixnum_value(SIGINT));

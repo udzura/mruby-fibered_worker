@@ -1,13 +1,14 @@
 module FiberedWorker
   class MainLoop
     attr_accessor :pid, :interval
-    attr_reader   :handlers, :timers
+    attr_reader   :handlers, :timers, :fd_checkers
 
     def initialize(opt={})
       @interval = opt[:interval] || 0 # by msec
       @pid = opt[:pid] || nil
       @handlers = {}
       @timers = []
+      @fd_checkers = []
     end
 
     def new_watchdog
@@ -46,6 +47,21 @@ module FiberedWorker
       end
     end
 
+    def register_fd(fd_no, &blk)
+      FiberedWorker.nonblocking_fd!(fd_no)
+      self.fd_checkers << Fiber.new do
+        keep = true
+        while keep
+          ret = FiberedWorker.read_nonblock(fd_no)
+          if ret
+            keep = false
+            blk.call(ret)
+          end
+          Fiber.yield ret
+        end
+      end
+    end
+
     def registered_signals
       self.handlers.keys
     end
@@ -73,6 +89,13 @@ module FiberedWorker
 
       ret = nil
       until ret = watchdog.resume
+        @fd_checkers.each do |checker|
+          if checker.alive?
+            checker.resume
+          else
+            @fd_checkers.delete checker
+          end
+        end
         if sig = FiberedWorker.sigtimedwait(self.handlers.keys, @interval)
           fib = self.handlers[sig]
           fib.resume if fib.alive?
