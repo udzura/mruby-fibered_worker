@@ -8,7 +8,7 @@ module FiberedWorker
       @pids = opt[:pid] || nil
       @pids = [@pids] unless @pids.is_a?(Array)
       @handlers = {}
-      @on_worker_exit = lambda {}
+      @on_worker_exit = lambda {|_, _| }
       @timers = []
       @fd_checkers = []
     end
