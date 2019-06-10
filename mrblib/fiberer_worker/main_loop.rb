@@ -1,28 +1,41 @@
 module FiberedWorker
   class MainLoop
-    attr_accessor :pid, :interval
+    attr_accessor :pids, :interval
     attr_reader   :handlers, :timers, :fd_checkers
 
     def initialize(opt={})
       @interval = opt[:interval] || 0 # by msec
-      @pid = opt[:pid] || nil
+      @pids = opt[:pid] || nil
+      @pids = [@pids] unless @pids.is_a?(Array)
       @handlers = {}
+      @on_worker_exit = lambda {}
       @timers = []
       @fd_checkers = []
     end
+    alias pid pids
+    def pid=(newpid)
+      self.pids = newpid.is_a?(Array) ? newpid : [newpid]
+    end
+
+    def on_worker_exit(&b)
+      if b
+        @on_worker_exit = b
+      else
+        @on_worker_exit
+      end
+    end
 
     def new_watchdog
-      target = self.pid
+      target = self.pids
       unless target
-        raise "Target pid must be set"
+        raise "Target pids must be set"
       end
 
       return Fiber.new do
-        keep = true
-        while keep
-          ret = Process.waitpid2(target, Process::WNOHANG)
+        until self.pids.empty?
+          ret = Process.waitpid2(-1, Process::WNOHANG)
           if ret
-            keep = false
+            self.pids.delete(ret[0])
           end
           Fiber.yield ret
         end
@@ -88,21 +101,26 @@ module FiberedWorker
       end
 
       ret = nil
-      until ret = watchdog.resume
-        @fd_checkers.each do |checker|
-          if checker.alive?
-            checker.resume
-          else
-            @fd_checkers.delete checker
+      termed = []
+      until self.pids.empty?
+        until ret = watchdog.resume
+          @fd_checkers.each do |checker|
+            if checker.alive?
+              checker.resume
+            else
+              @fd_checkers.delete checker
+            end
+          end
+          if sig = FiberedWorker.sigtimedwait(self.handlers.keys, @interval)
+            fib = self.handlers[sig]
+            fib.resume if fib.alive?
           end
         end
-        if sig = FiberedWorker.sigtimedwait(self.handlers.keys, @interval)
-          fib = self.handlers[sig]
-          fib.resume if fib.alive?
-        end
+        self.on_worker_exit.call(ret, self.pids)
+        termed << ret
       end
 
-      return ret
+      return termed
     end
   end
 end
