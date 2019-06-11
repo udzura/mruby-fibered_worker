@@ -17,6 +17,10 @@ loop.register_handler(FiberedWorker::SIGRTMIN, false) do |signo|
   puts "Hey, this is SIGRTMIN: #{signo}"
 end
 
+loop.on_worker_exit do |status, rest|
+  puts "Killed process! #{status}"
+end
+
 puts "Kill to: [#{Process.pid}]"
 loop.run
 puts "Loop exited"
