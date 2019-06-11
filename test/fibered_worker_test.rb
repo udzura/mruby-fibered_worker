@@ -55,8 +55,10 @@ assert("FiberedWorker::MainLoop#register_handler with multi worker") do
     ::Process.kill FiberedWorker::SIGTERM, pid2
   end
 
-  FiberedWorker::Timer.new(SIGRT4).start 50
-  FiberedWorker::Timer.new(SIGRT5).start 100
+  t = FiberedWorker::Timer.new(SIGRT4)
+  t.start 50
+  t2 = FiberedWorker::Timer.new(SIGRT5)
+  t2.start 100
 
   ret = l.run
   assert_equal ret.size, 2, "ret.size should be 2"
