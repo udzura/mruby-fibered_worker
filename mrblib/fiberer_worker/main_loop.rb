@@ -9,7 +9,7 @@ module FiberedWorker
       @pids = [@pids] unless @pids.is_a?(Array)
       @handlers = {}
       @on_worker_exit = lambda {|_, _| }
-      @timers = []
+      @timers = {}
       @fd_checkers = []
     end
     alias pid pids
@@ -85,16 +85,20 @@ module FiberedWorker
 
     def register_timer(signo, start, interval=0, &blk)
       register_handler(signo, (interval == 0), &blk)
-      self.timers << [
+      self.timers[FiberedWorker.obj2signo(signo)] = [
         FiberedWorker::Timer.new(signo),
         [start, interval]
       ]
     end
 
+    def timer_for(signo)
+      self.timers[FiberedWorker.obj2signo(signo)]
+    end
+
     def run
       FiberedWorker.sigprocmask(self.handlers.keys)
       watchdog = new_watchdog
-      self.timers.each do |data|
+      self.timers.each do |signo, data|
         timer = data[0]
         args = data[1]
         timer.start(args[0], args[1])
