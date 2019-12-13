@@ -4,7 +4,9 @@ module FiberedWorker
     attr_reader   :handlers, :timers, :fd_checkers
 
     def initialize(opt={})
-      @interval = opt[:interval] || 0 # by msec
+      @use_legacy_watchdog = opt[:use_legacy_watchdog] || false
+      # by msec
+      @interval = opt[:interval] || (@use_legacy_watchdog ? 0 : 1000)
       @pids = opt[:pid] || nil
       @pids = [@pids] unless @pids.is_a?(Array)
       @handlers = {}
@@ -12,7 +14,8 @@ module FiberedWorker
       @timers = {}
       @fd_checkers = []
       @termed = []
-      @use_legacy_watchdog = true # opt[:use_legacy_watchdog] || false
+
+      @last_ret = []
     end
     alias pid pids
     def pid=(newpid)
@@ -47,9 +50,27 @@ module FiberedWorker
     end
 
     def new_nil_watchdog
+      last_ret = @last_ret
       return Fiber.new do
-        until self.pids.empty?
-          Fiber.yield true
+        loop do
+          if last_ret[0]
+            Fiber.yield last_ret.shift
+          else
+            Fiber.yield nil
+          end
+        end
+      end
+    end
+
+    def register_sigchld_watchdog
+      last_ret = @last_ret
+      pids_ = self.pids
+      termed = @termed
+      register_handler(:CHLD, false) do
+        while !pids_.empty? && ret = Process.waitpid2(-1, Process::WNOHANG)
+          pids_.delete(ret[0])
+          last_ret << ret
+          termed << ret
         end
       end
     end
@@ -108,6 +129,10 @@ module FiberedWorker
     end
 
     def run
+      unless use_legacy_watchdog
+        register_sigchld_watchdog
+      end
+
       FiberedWorker.sigprocmask(self.handlers.keys)
       watchdog = use_legacy_watchdog ? new_watchdog : new_nil_watchdog
       self.timers.each do |signo, data|

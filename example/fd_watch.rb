@@ -1,4 +1,4 @@
-loop = FiberedWorker::MainLoop.new
+loop = FiberedWorker::MainLoop.new(interval: 0)
 r, w = IO.pipe
 
 pid = fork do
