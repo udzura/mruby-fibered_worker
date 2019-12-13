@@ -175,10 +175,13 @@ static mrb_value mrb_fw_read_nonblock(mrb_state *mrb, mrb_value self)
 {
   int ret;
   mrb_int fd;
-  uint64_t result;
+  uint64_t result = 0;
   mrb_get_args(mrb, "i", &fd);
-  ret = read(fd, &result, sizeof(result));
-  if (ret == -1) {
+  ret = read((int)fd, &result, sizeof(result));
+  if(!ret) {
+    /* no content is read */
+    return mrb_nil_value();
+  } else if (ret == -1) {
     if (errno == EAGAIN) {
       return mrb_nil_value();
     } else {
